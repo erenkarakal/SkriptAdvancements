@@ -1,0 +1,7 @@
+name: SkriptAdvancements
+version: '${project.version}'
+main: me.eren.skriptadvancements.SkriptAdvancements
+api-version: '1.17'
+author: eren.
+depend:
+  - Skript
