@@ -144,18 +144,23 @@ public class SecAdvancement extends Section {
 
         AdvancementDisplay display = new AdvancementDisplay(icon.getMaterial(), title, frameType, showToast, announceToChat, x.floatValue(), y.floatValue(), description);
         if (isRoot) {
-            AdvancementTab tab = Objects.requireNonNull(SkriptAdvancements.getAdvancementAPI().getAdvancementTab(preTab));
-            RootAdvancement root = new RootAdvancement(tab, key, display, backgroundPath, Math.min(maxProgression.intValue(), 1)); // TODO: this line throws a stack trace, not sure why
-            ExprTabs.TABS.get(preTab).setRoot(root);
+            AdvancementTab tab = SkriptAdvancements.getAdvancementAPI().getAdvancementTab(preTab);
+            if (tab != null) {
+                RootAdvancement root = new RootAdvancement(tab, key, display, backgroundPath, Math.min(maxProgression.intValue(), 1));
+                ExprTabs.TABS.get(preTab).setRoot(root);
+            }
         } else {
-            Advancement parentAdvancement = Objects.requireNonNull(SkriptAdvancements.getAdvancementAPI().getAdvancement(parent)); // TODO: this line throws a stack trace, not sure why
-            ExprTabs.TABS.get(preTab).addAdvancement(new BaseAdvancement(key, display, parentAdvancement, Math.min(maxProgression.intValue(), 1)));
+            Advancement parentAdvancement = SkriptAdvancements.getAdvancementAPI().getAdvancement(parent);
+            if (parentAdvancement != null)
+                ExprTabs.TABS.get(preTab).addAdvancement(new BaseAdvancement(key, display, parentAdvancement, Math.min(maxProgression.intValue(), 1)));
+            else
+                Bukkit.getLogger().info("parent advancement was null");
         }
     }
 
     @Override
     public @NotNull String toString(Event event, boolean debug) {
-        return "register a new advancement";
+        return "register a new " + (isRoot ? "root " : "") + "advancement";
     }
 
 }
