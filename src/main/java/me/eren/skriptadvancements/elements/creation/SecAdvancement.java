@@ -3,9 +3,9 @@ package me.eren.skriptadvancements.elements.creation;
 import ch.njol.skript.Skript;
 import ch.njol.skript.aliases.ItemType;
 import ch.njol.skript.config.SectionNode;
-import ch.njol.skript.lang.EffectSection;
 import ch.njol.skript.lang.Expression;
-import ch.njol.skript.lang.SkriptParser;
+import ch.njol.skript.lang.Section;
+import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.skript.lang.TriggerItem;
 import ch.njol.util.Kleenean;
 import com.fren_gor.ultimateAdvancementAPI.AdvancementTab;
@@ -16,49 +16,57 @@ import com.fren_gor.ultimateAdvancementAPI.advancement.display.AdvancementDispla
 import com.fren_gor.ultimateAdvancementAPI.advancement.display.AdvancementFrameType;
 import me.eren.skriptadvancements.AdvancementUtils;
 import me.eren.skriptadvancements.SkriptAdvancements;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.event.Event;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.skriptlang.skript.lang.entry.EntryContainer;
 import org.skriptlang.skript.lang.entry.EntryValidator;
 import org.skriptlang.skript.lang.entry.util.ExpressionEntryData;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 @SuppressWarnings("unchecked")
-public class SecAdvancement extends EffectSection {
+public class SecAdvancement extends Section {
 
     private static final EntryValidator.EntryValidatorBuilder ENTRY_VALIDATOR = EntryValidator.builder();
 
-    private Expression<String> keyExpression, titleExpression, descriptionExpression, backgroundPathExpression, parentExpression;
-    private Expression<ItemType> iconExpression, backgroundExpression;
-    private Expression<AdvancementFrameType> frameTypeExpression;
-    private Expression<Boolean> showToastExpression, announceToChatExpression;
-    private Expression<Double> xExpression, yExpression;
-    private Expression<Long> maxProgressionExpression;
+    private Expression<String> key, title, description, backgroundPath, tab, parent;
+    private Expression<ItemType> icon, background;
+    private Expression<AdvancementFrameType> frameType;
+    private Expression<Boolean> showToast, announceToChat;
+    private Expression<Number> x, y, maxProgression;
     private boolean isRoot;
 
     static {
-        Skript.registerSection(SecAdvancement.class, "(create|register) a new [(:root)] advancement");
+        Skript.registerSection(SecAdvancement.class, "(create|register) a new [:root] advancement");
 
+        ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("tab", null, true, String.class));
         ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("parent", null, true, String.class));
         ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("key", null, false, String.class));
-        ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("icon", null, false, ItemType.class));
         ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("title", null, false, String.class));
         ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("description", null, false, String.class));
-        ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("frame type", null, false, AdvancementFrameType.class));
-        ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("show toast", null, false, boolean.class));
-        ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("announce to chat", null, false, boolean.class));
-        ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("x", null, false, double.class));
-        ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("y", null, false, double.class));
-        ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("background", null, true, ItemType.class));
         ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("background path", null, true, String.class));
-        ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("max progression", null, true, long.class));
+
+        ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("icon", null, false, ItemType.class));
+        ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("background", null, true, ItemType.class));
+
+        ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("show toast", null, false, Boolean.class));
+        ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("announce completion", null, false, Boolean.class));
+
+        ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("frame type", null, false, AdvancementFrameType.class));
+
+        ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("x", null, false, Number.class));
+        ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("y", null, false, Number.class));
+        ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("max progression", null, true, Number.class));
     }
 
     @Override
-    public boolean init(Expression<?>[] expressions, int matchedPattern, Kleenean isDelayed,
-                        SkriptParser.ParseResult parseResult, SectionNode sectionNode, List<TriggerItem> triggerItems) {
+    @SuppressWarnings("NullableProblems")
+    public boolean init(Expression<?>[] exprs, int matchedPattern, Kleenean isDelayed, ParseResult parseResult, SectionNode sectionNode, List<TriggerItem> triggerItems) {
         EntryContainer container = ENTRY_VALIDATOR.build().validate(sectionNode);
         if (container == null) return false;
         isRoot = parseResult.hasTag("root");
@@ -67,75 +75,86 @@ public class SecAdvancement extends EffectSection {
             Skript.error("The builder must have either 'background' or 'background path' entry");
             return false;
         }
+        if (isRoot && container.getOptional("tab", false) == null) {
+            Skript.error("Root advancements must have a 'tab' entry");
+            return false;
+        }
         if (!isRoot && container.getOptional("parent", false) == null) {
             Skript.error("Non-root advancements must have a 'parent' entry");
             return false;
         }
 
-        parentExpression = (Expression<String>) container.get("parent", false);
-        keyExpression = (Expression<String>) container.get("key", false);
-        iconExpression = (Expression<ItemType>) container.get("icon", false);
-        titleExpression = (Expression<String>) container.get("title", false);
-        descriptionExpression = (Expression<String>) container.get("description", false);
-        frameTypeExpression = (Expression<AdvancementFrameType>) container.get("frame type", false);
-        showToastExpression = (Expression<Boolean>) container.get("show toast", false);
-        announceToChatExpression = (Expression<Boolean>) container.get("announce to chat", false);
-        xExpression = (Expression<Double>) container.get("x", false);
-        yExpression = (Expression<Double>) container.get("y", false);
-        backgroundExpression = (Expression<ItemType>) container.get("background", false);
-        backgroundPathExpression = (Expression<String>) container.get("background path", false);
-        maxProgressionExpression = (Expression<Long>) container.get("max progression", false);
+        tab = (Expression<String>) container.getOptional("tab", false);
+        parent = (Expression<String>) container.getOptional("parent", false);
+        key = (Expression<String>) container.getOptional("key", false);
+        icon = (Expression<ItemType>) container.getOptional("icon", false);
+        title = (Expression<String>) container.getOptional("title", false);
+        description = (Expression<String>) container.getOptional("description", false);
+        frameType = (Expression<AdvancementFrameType>) container.getOptional("frame type", false);
+        showToast = (Expression<Boolean>) container.getOptional("show toast", false);
+        announceToChat = (Expression<Boolean>) container.getOptional("announce completion", false);
+        x = (Expression<Number>) container.getOptional("x", false);
+        y = (Expression<Number>) container.getOptional("y", false);
+        background = (Expression<ItemType>) container.getOptional("background", false);
+        backgroundPath = (Expression<String>) container.getOptional("background path", false);
+        maxProgression = (Expression<Number>) container.getOptional("max progression", false);
         return true;
     }
 
     @Override
-    protected TriggerItem walk(Event event) {
-        String key = Objects.requireNonNull(keyExpression.getSingle(event));
-        String title = Objects.requireNonNull(titleExpression.getSingle(event));
-        String description = Objects.requireNonNull(descriptionExpression.getSingle(event));
-        Material icon = Objects.requireNonNull(iconExpression.getSingle(event)).getMaterial();
-        String advancementParent = Objects.requireNonNull(parentExpression.getSingle(event));
+    protected @Nullable TriggerItem walk(@NotNull Event event) {
+        execute(event);
+        return super.walk(event, false);
+    }
+
+    @SuppressWarnings("ConstantConditions")
+    private void execute(Event event) {
+        String key = this.key == null ? null : this.key.getSingle(event);
+        String title = this.title == null ? null : this.title.getSingle(event);
+        String description = this.description == null ? null : this.description.getSingle(event);
+        ItemType icon = this.icon == null ? null : this.icon.getSingle(event);
+        String preTab = this.tab == null ? null : this.tab.getSingle(event);
+        String parent = this.parent == null ? null : this.parent.getSingle(event);
 
         String backgroundPath;
-        ItemType backgroundItem = backgroundExpression.getSingle(event);
+        ItemType backgroundItem = this.background == null ? null : this.background.getSingle(event);
         if (backgroundItem != null) {
             backgroundPath = AdvancementUtils.getTexture(backgroundItem.getMaterial());
         } else {
-            backgroundPath = Objects.requireNonNull(backgroundPathExpression.getSingle(event));
+            backgroundPath = this.backgroundPath == null ? null : this.backgroundPath.getSingle(event);
         }
 
-        AdvancementFrameType frameType = Objects.requireNonNull(frameTypeExpression.getSingle(event));
-        boolean showToast = Boolean.TRUE.equals(showToastExpression.getSingle(event));
-        boolean announceToChat = Boolean.TRUE.equals(announceToChatExpression.getSingle(event));
-        float x = Objects.requireNonNull(xExpression.getSingle(event)).floatValue();
-        float y = Objects.requireNonNull(yExpression.getSingle(event)).floatValue();
-        int maxProgression = Objects.requireNonNull(maxProgressionExpression.getSingle(event)).intValue();
+        AdvancementFrameType frameType = this.frameType == null ? null : this.frameType.getSingle(event);
+        boolean showToast = Boolean.TRUE.equals(this.showToast.getSingle(event));
+        boolean announceToChat = Boolean.TRUE.equals(this.announceToChat.getSingle(event));
+        Number x = this.x == null ? null : this.x.getSingle(event);
+        Number y = this.y == null ? null : this.y.getSingle(event);
+        Number maxProgression = this.maxProgression == null ? null : this.maxProgression.getSingle(event);
 
-        Advancement advancement;
-        AdvancementDisplay display = new AdvancementDisplay(icon, title, frameType, showToast, announceToChat, x, y, description);
+        if (Stream.of(key, title, description, icon, backgroundPath, frameType, x, y, maxProgression).anyMatch(Objects::isNull)) {
+            Bukkit.getLogger().info("returning due to null element");
+            return;
+        } else if (preTab == null && isRoot) {
+            Bukkit.getLogger().info("returning due to null tab");
+            return;
+        } else if (parent == null && !isRoot) {
+            Bukkit.getLogger().info("returning due to null parent");
+            return;
+        }
+
+        AdvancementDisplay display = new AdvancementDisplay(icon.getMaterial(), title, frameType, showToast, announceToChat, x.floatValue(), y.floatValue(), description);
         if (isRoot) {
-            AdvancementTab tab = SecRegisterTab.lastCreatedTab.tab;
-            if (maxProgression > 0) {
-                advancement = new RootAdvancement(tab, key, display, backgroundPath, maxProgression);
-            } else {
-                advancement = new RootAdvancement(tab, key, display, backgroundPath);
-            }
-            SecRegisterTab.lastCreatedTab.rootAdvancement = (RootAdvancement) advancement;
+            AdvancementTab tab = Objects.requireNonNull(SkriptAdvancements.getAdvancementAPI().getAdvancementTab(preTab));
+            RootAdvancement root = new RootAdvancement(tab, key, display, backgroundPath, Math.min(maxProgression.intValue(), 1)); // TODO: this line throws a stack trace, not sure why
+            ExprTabs.TABS.get(preTab).setRoot(root);
         } else {
-            Advancement parentAdvancement = Objects.requireNonNull(SkriptAdvancements.getAdvancementAPI().getAdvancement(advancementParent));
-            if (maxProgression > 0) {
-                advancement = new BaseAdvancement(key, display, parentAdvancement, maxProgression);
-            } else {
-                advancement = new BaseAdvancement(key, display, parentAdvancement);
-            }
-            SecRegisterTab.lastCreatedTab.advancements.add((BaseAdvancement) advancement);
+            Advancement parentAdvancement = Objects.requireNonNull(SkriptAdvancements.getAdvancementAPI().getAdvancement(parent)); // TODO: this line throws a stack trace, not sure why
+            ExprTabs.TABS.get(preTab).addAdvancement(new BaseAdvancement(key, display, parentAdvancement, Math.min(maxProgression.intValue(), 1)));
         }
-
-        return getNext();
     }
 
     @Override
-    public String toString(Event event, boolean debug) {
+    public @NotNull String toString(Event event, boolean debug) {
         return "register a new advancement";
     }
 
