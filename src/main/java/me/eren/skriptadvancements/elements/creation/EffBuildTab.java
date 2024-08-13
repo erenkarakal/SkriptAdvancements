@@ -3,33 +3,39 @@ package me.eren.skriptadvancements.elements.creation;
 import ch.njol.skript.Skript;
 import ch.njol.skript.lang.Effect;
 import ch.njol.skript.lang.Expression;
-import ch.njol.skript.lang.SkriptParser;
+import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.util.Kleenean;
+import me.eren.skriptadvancements.AdvancementTabBuilder;
 import org.bukkit.event.Event;
 
 public class EffBuildTab extends Effect {
 
     static {
-        Skript.registerEffect(EffBuildTab.class, "build [advancement] tab");
+        Skript.registerEffect(EffBuildTab.class, "(build|finali(z|s)e) [advancement] [tab[s]] %advancementtabs%");
     }
 
+    private Expression<AdvancementTabBuilder> tabs;
+
     @Override
-    public boolean init(Expression<?>[] expressions, int matchedPattern, Kleenean isDelayed, SkriptParser.ParseResult parseResult) {
-        if (getParser().isCurrentSection(SecRegisterTab.class)) {
-            Skript.error("This effect can only be used inside an advancement tab section");
-            return false;
-        }
+    @SuppressWarnings({"NullableProblems", "unchecked"})
+    public boolean init(Expression<?>[] exprs, int matchedPattern, Kleenean isDelayed, ParseResult parseResult) {
+        tabs = (Expression<AdvancementTabBuilder>) exprs[0];
         return true;
     }
 
     @Override
+    @SuppressWarnings("NullableProblems")
     protected void execute(Event event) {
-        SecRegisterTab.lastCreatedTab.build();
+        for (AdvancementTabBuilder tab : tabs.getArray(event)) {
+            if (!tab.tab.isInitialised())
+                tab.build();
+        }
     }
 
     @Override
+    @SuppressWarnings("NullableProblems")
     public String toString(Event event, boolean debug) {
-        return "build advancement tab";
+        return "build advancement tabs " + tabs.toString(event, debug);
     }
 
 }
