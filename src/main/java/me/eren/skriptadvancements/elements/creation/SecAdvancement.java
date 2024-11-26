@@ -15,9 +15,6 @@ import com.fren_gor.ultimateAdvancementAPI.advancement.RootAdvancement;
 import com.fren_gor.ultimateAdvancementAPI.advancement.display.AdvancementDisplay;
 import com.fren_gor.ultimateAdvancementAPI.advancement.display.AdvancementFrameType;
 import me.eren.skriptadvancements.AdvancementUtils;
-import me.eren.skriptadvancements.SkriptAdvancements;
-import org.bukkit.Bukkit;
-import org.bukkit.Material;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -26,15 +23,13 @@ import org.skriptlang.skript.lang.entry.EntryValidator;
 import org.skriptlang.skript.lang.entry.util.ExpressionEntryData;
 
 import java.util.List;
-import java.util.Objects;
-import java.util.stream.Stream;
 
 @SuppressWarnings("unchecked")
 public class SecAdvancement extends Section {
 
     private static final EntryValidator.EntryValidatorBuilder ENTRY_VALIDATOR = EntryValidator.builder();
 
-    private Expression<String> key, title, description, backgroundPath, tab, parent;
+    private Expression<String> key, title, description, backgroundPath, parent;
     private Expression<ItemType> icon, background;
     private Expression<AdvancementFrameType> frameType;
     private Expression<Boolean> showToast, announceToChat;
@@ -44,7 +39,6 @@ public class SecAdvancement extends Section {
     static {
         Skript.registerSection(SecAdvancement.class, "(create|register) a new [:root] advancement");
 
-        ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("tab", null, true, String.class));
         ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("parent", null, true, String.class));
         ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("key", null, false, String.class));
         ENTRY_VALIDATOR.addEntryData(new ExpressionEntryData<>("title", null, false, String.class));
@@ -71,12 +65,8 @@ public class SecAdvancement extends Section {
         if (container == null) return false;
         isRoot = parseResult.hasTag("root");
 
-        if (container.getOptional("background", false) == null && container.getOptional("background path", false) == null) {
-            Skript.error("The builder must have either 'background' or 'background path' entry");
-            return false;
-        }
-        if (isRoot && container.getOptional("tab", false) == null) {
-            Skript.error("Root advancements must have a 'tab' entry");
+        if (isRoot && container.getOptional("background", false) == null && container.getOptional("background path", false) == null) {
+            Skript.error("Root advancement must have either 'background' or 'background path' entry");
             return false;
         }
         if (!isRoot && container.getOptional("parent", false) == null) {
@@ -84,7 +74,6 @@ public class SecAdvancement extends Section {
             return false;
         }
 
-        tab = (Expression<String>) container.getOptional("tab", false);
         parent = (Expression<String>) container.getOptional("parent", false);
         key = (Expression<String>) container.getOptional("key", false);
         icon = (Expression<ItemType>) container.getOptional("icon", false);
@@ -113,7 +102,6 @@ public class SecAdvancement extends Section {
         String title = this.title == null ? null : this.title.getSingle(event);
         String description = this.description == null ? null : this.description.getSingle(event);
         ItemType icon = this.icon == null ? null : this.icon.getSingle(event);
-        String preTab = this.tab == null ? null : this.tab.getSingle(event);
         String parent = this.parent == null ? null : this.parent.getSingle(event);
 
         String backgroundPath;
@@ -129,32 +117,19 @@ public class SecAdvancement extends Section {
         boolean announceToChat = Boolean.TRUE.equals(this.announceToChat.getSingle(event));
         Number x = this.x == null ? null : this.x.getSingle(event);
         Number y = this.y == null ? null : this.y.getSingle(event);
-        Number maxProgression = this.maxProgression == null ? null : this.maxProgression.getSingle(event);
-
-        if (Stream.of(key, title, description, icon, backgroundPath, frameType, x, y, maxProgression).anyMatch(Objects::isNull)) {
-            Bukkit.getLogger().info("returning due to null element");
-            return;
-        } else if (preTab == null && isRoot) {
-            Bukkit.getLogger().info("returning due to null tab");
-            return;
-        } else if (parent == null && !isRoot) {
-            Bukkit.getLogger().info("returning due to null parent");
-            return;
-        }
+        Number maxProgression = this.maxProgression == null ? 1 : this.maxProgression.getSingle(event);
 
         AdvancementDisplay display = new AdvancementDisplay(icon.getMaterial(), title, frameType, showToast, announceToChat, x.floatValue(), y.floatValue(), description);
         if (isRoot) {
-            AdvancementTab tab = SkriptAdvancements.getAdvancementAPI().getAdvancementTab(preTab);
+            AdvancementTab tab = SecAdvancementTab.lastCreatedTab.getTab();
             if (tab != null) {
                 RootAdvancement root = new RootAdvancement(tab, key, display, backgroundPath, Math.min(maxProgression.intValue(), 1));
-                ExprTabs.TABS.get(preTab).setRoot(root);
+                SecAdvancementTab.lastCreatedTab.setRoot(root);
             }
         } else {
-            Advancement parentAdvancement = SkriptAdvancements.getAdvancementAPI().getAdvancement(parent);
+            Advancement parentAdvancement = SecAdvancementTab.lastCreatedTab.getAdvancement(parent);
             if (parentAdvancement != null)
-                ExprTabs.TABS.get(preTab).addAdvancement(new BaseAdvancement(key, display, parentAdvancement, Math.min(maxProgression.intValue(), 1)));
-            else
-                Bukkit.getLogger().info("parent advancement was null");
+                SecAdvancementTab.lastCreatedTab.addAdvancement(key, new BaseAdvancement(key, display, parentAdvancement, Math.min(maxProgression.intValue(), 1)));
         }
     }
 

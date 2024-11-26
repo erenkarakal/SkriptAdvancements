@@ -11,7 +11,7 @@ import org.bukkit.event.Event;
 public class EffDisableVanillaAdvancements extends Effect {
 
     static {
-        Skript.registerEffect(EffDisableVanillaAdvancements.class, "disable all vanilla advancements");
+        Skript.registerEffect(EffDisableVanillaAdvancements.class, "disable all [of the] vanilla advancements");
     }
 
     @Override
