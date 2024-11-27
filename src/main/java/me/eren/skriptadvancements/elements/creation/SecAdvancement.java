@@ -8,13 +8,12 @@ import ch.njol.skript.lang.Section;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.skript.lang.TriggerItem;
 import ch.njol.util.Kleenean;
-import com.fren_gor.ultimateAdvancementAPI.AdvancementTab;
-import com.fren_gor.ultimateAdvancementAPI.advancement.Advancement;
-import com.fren_gor.ultimateAdvancementAPI.advancement.BaseAdvancement;
-import com.fren_gor.ultimateAdvancementAPI.advancement.RootAdvancement;
 import com.fren_gor.ultimateAdvancementAPI.advancement.display.AdvancementDisplay;
 import com.fren_gor.ultimateAdvancementAPI.advancement.display.AdvancementFrameType;
+import me.eren.skriptadvancements.AdvancementTabBuilder;
 import me.eren.skriptadvancements.AdvancementUtils;
+import me.eren.skriptadvancements.wrapper.BaseAdvancementWrapper;
+import me.eren.skriptadvancements.wrapper.RootAdvancementWrapper;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -76,16 +75,20 @@ public class SecAdvancement extends Section {
 
         parent = (Expression<String>) container.getOptional("parent", false);
         key = (Expression<String>) container.getOptional("key", false);
-        icon = (Expression<ItemType>) container.getOptional("icon", false);
-        title = (Expression<String>) container.getOptional("title", false);
         description = (Expression<String>) container.getOptional("description", false);
-        frameType = (Expression<AdvancementFrameType>) container.getOptional("frame type", false);
+        title = (Expression<String>) container.getOptional("title", false);
+        backgroundPath = (Expression<String>) container.getOptional("background path", false);
+
+        icon = (Expression<ItemType>) container.getOptional("icon", false);
+        background = (Expression<ItemType>) container.getOptional("background", false);
+
         showToast = (Expression<Boolean>) container.getOptional("show toast", false);
         announceToChat = (Expression<Boolean>) container.getOptional("announce completion", false);
+
+        frameType = (Expression<AdvancementFrameType>) container.getOptional("frame type", false);
+
         x = (Expression<Number>) container.getOptional("x", false);
         y = (Expression<Number>) container.getOptional("y", false);
-        background = (Expression<ItemType>) container.getOptional("background", false);
-        backgroundPath = (Expression<String>) container.getOptional("background path", false);
         maxProgression = (Expression<Number>) container.getOptional("max progression", false);
         return true;
     }
@@ -113,23 +116,22 @@ public class SecAdvancement extends Section {
         }
 
         AdvancementFrameType frameType = this.frameType == null ? null : this.frameType.getSingle(event);
+
         boolean showToast = Boolean.TRUE.equals(this.showToast.getSingle(event));
         boolean announceToChat = Boolean.TRUE.equals(this.announceToChat.getSingle(event));
+
         Number x = this.x == null ? null : this.x.getSingle(event);
         Number y = this.y == null ? null : this.y.getSingle(event);
         Number maxProgression = this.maxProgression == null ? 1 : this.maxProgression.getSingle(event);
 
         AdvancementDisplay display = new AdvancementDisplay(icon.getMaterial(), title, frameType, showToast, announceToChat, x.floatValue(), y.floatValue(), description);
+
+        AdvancementTabBuilder tab = SecAdvancementTab.lastCreatedTab;
         if (isRoot) {
-            AdvancementTab tab = SecAdvancementTab.lastCreatedTab.getTab();
-            if (tab != null) {
-                RootAdvancement root = new RootAdvancement(tab, key, display, backgroundPath, Math.min(maxProgression.intValue(), 1));
-                SecAdvancementTab.lastCreatedTab.setRoot(root);
-            }
+            RootAdvancementWrapper root = new RootAdvancementWrapper(key, display, backgroundPath, Math.min(maxProgression.intValue(), 1));
+            tab.setRoot(root);
         } else {
-            Advancement parentAdvancement = SecAdvancementTab.lastCreatedTab.getAdvancement(parent);
-            if (parentAdvancement != null)
-                SecAdvancementTab.lastCreatedTab.addAdvancement(key, new BaseAdvancement(key, display, parentAdvancement, Math.min(maxProgression.intValue(), 1)));
+            tab.addAdvancement(key, new BaseAdvancementWrapper(key, display, parent, Math.min(maxProgression.intValue(), 1)));
         }
     }
 

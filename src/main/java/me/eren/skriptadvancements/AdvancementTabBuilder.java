@@ -1,42 +1,39 @@
 package me.eren.skriptadvancements;
 
 import com.fren_gor.ultimateAdvancementAPI.AdvancementTab;
+import com.fren_gor.ultimateAdvancementAPI.UltimateAdvancementAPI;
 import com.fren_gor.ultimateAdvancementAPI.advancement.Advancement;
 import com.fren_gor.ultimateAdvancementAPI.advancement.BaseAdvancement;
 import com.fren_gor.ultimateAdvancementAPI.advancement.RootAdvancement;
+import me.eren.skriptadvancements.elements.creation.SecAdvancementTab;
+import me.eren.skriptadvancements.wrapper.BaseAdvancementWrapper;
+import me.eren.skriptadvancements.wrapper.RootAdvancementWrapper;
 
 import java.util.HashMap;
 import java.util.HashSet;
 
 public class AdvancementTabBuilder {
 
-    private final AdvancementTab tab;
-    private RootAdvancement rootAdvancement;
-    private final HashMap<String, BaseAdvancement> advancements = new HashMap<>();
+    private final String tabName;
+    private RootAdvancementWrapper rootAdvancement;
+    private final HashMap<String, BaseAdvancementWrapper> advancements = new HashMap<>();
 
-    public AdvancementTabBuilder(AdvancementTab tab) {
-        this.tab = tab;
+    public AdvancementTabBuilder(String tabName) {
+        this.tabName = tabName;
     }
 
     /**
-     * @return The advancement tab
+     * @return The name of the advancement tab
      */
-    public AdvancementTab getTab() {
-        return tab;
-    }
-
-    /**
-     * @return The root advancement
-     */
-    public RootAdvancement getRoot() {
-        return rootAdvancement;
+    public String getTabName() {
+        return tabName;
     }
 
     /**
      * Sets the root advancement
      * @param root The advancement to set it to
      */
-    public void setRoot(RootAdvancement root) {
+    public void setRoot(RootAdvancementWrapper root) {
         this.rootAdvancement = root;
     }
 
@@ -45,36 +42,28 @@ public class AdvancementTabBuilder {
      * @param id The ID of the advancement
      * @param advancement The advancement to register
      */
-    public void addAdvancement(String id, BaseAdvancement advancement) {
-        this.advancements.put(id, advancement);
-    }
-
-    /**
-     * @param id The ID of the advancement
-     * @return The advancement if it exists, otherwise the root advancement
-     */
-    public Advancement getAdvancement(String id) {
-        if (advancements.containsKey(id)) return advancements.get(id);
-        return rootAdvancement;
+    public void addAdvancement(String id, BaseAdvancementWrapper advancement) {
+        advancements.put(id, advancement);
     }
 
     /**
      * Registers the advancement tab, overwriting any existing tab
      */
     public void build() {
-//        UltimateAdvancementAPI api = SkriptAdvancements.getAdvancementAPI();
-//        String rootNamespace = rootAdvancement.getKey().getNamespace();
-//        if (api.isAdvancementTabRegistered(rootNamespace)) {
-//            // temporary workaround
-//            AdvancementTab oldTab = api.getAdvancementTab(rootNamespace);
-//            if (!oldTab.isInitialised()) {
-//                oldTab.registerAdvancements(new RootAdvancement(oldTab, rootNamespace,
-//                        new AdvancementDisplay(Material.STONE, "a", AdvancementFrameType.GOAL, false, false, 5, 5), AdvancementUtils.getTexture(Material.STONE)),
-//                        Collections.emptySet());
-//            }
-//            api.unregisterAdvancementTab(rootNamespace);
-//        }
-        tab.registerAdvancements(rootAdvancement, new HashSet<>(advancements.values()));
+        UltimateAdvancementAPI api = SkriptAdvancements.getAdvancementAPI();
+        if (api.isAdvancementTabRegistered(tabName) && api.getAdvancementTab(tabName).isInitialised()) {
+            api.unregisterAdvancementTab(tabName);
+        }
+        AdvancementTab tab = api.createAdvancementTab(tabName);
+        RootAdvancement root = rootAdvancement.withTab(tab);
+        HashMap<String, BaseAdvancement> createdAdvancements = new HashMap<>();
+        for (BaseAdvancementWrapper advancement : advancements.values()) {
+            Advancement parent = createdAdvancements.containsKey(advancement.getParent())
+                    ? createdAdvancements.get(advancement.getParent()) : root;
+            createdAdvancements.put(advancement.getKey(), advancement.withParent(parent));
+        }
+        tab.registerAdvancements(root, new HashSet<>(createdAdvancements.values()));
+        SecAdvancementTab.lastCreatedTab = null;
     }
 
 }

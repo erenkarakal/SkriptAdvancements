@@ -7,9 +7,7 @@ import ch.njol.skript.lang.Section;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.skript.lang.TriggerItem;
 import ch.njol.util.Kleenean;
-import com.fren_gor.ultimateAdvancementAPI.AdvancementTab;
 import me.eren.skriptadvancements.AdvancementTabBuilder;
-import me.eren.skriptadvancements.SkriptAdvancements;
 import org.bukkit.event.Event;
 
 import java.util.List;
@@ -33,8 +31,7 @@ public class SecAdvancementTab extends Section {
     @Override
     protected TriggerItem walk(Event event) {
         String name = this.name.getSingle(event);
-        AdvancementTab tab = SkriptAdvancements.getAdvancementAPI().createAdvancementTab(name);
-        lastCreatedTab = new AdvancementTabBuilder(tab);
+        lastCreatedTab = new AdvancementTabBuilder(name);
         return walk(event, true);
     }
 
@@ -43,4 +40,5 @@ public class SecAdvancementTab extends Section {
     public String toString(Event event, boolean debug) {
         return "register an advancement tab named " + this.name;
     }
+
 }
